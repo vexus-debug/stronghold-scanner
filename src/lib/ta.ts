@@ -203,20 +203,39 @@ export function findSRZones(
   return zones.sort((a, b) => b.strength - a.strength);
 }
 
-// Pick the closest strong S/R the price is heading toward based on last candle direction.
+// Pick the closest strong S/R the price is heading toward based on short-term momentum.
+// Uses the slope of the last N closes (not just one candle's color) for a more robust signal.
 export function nearestHeadingZone(
   zones: SRZone[],
   currentPrice: number,
-  lastCandleDir: "up" | "down"
+  dir: "up" | "down"
 ): SRZone | null {
   const filtered = zones.filter((z) =>
-    lastCandleDir === "up" ? z.level > currentPrice : z.level < currentPrice
+    dir === "up" ? z.level > currentPrice : z.level < currentPrice
   );
   if (filtered.length === 0) return null;
-  filtered.sort(
-    (a, b) => Math.abs(a.level - currentPrice) - Math.abs(b.level - currentPrice)
-  );
+  // Rank by closeness, but prefer stronger zones when distances are similar.
+  filtered.sort((a, b) => {
+    const da = Math.abs(a.level - currentPrice) / currentPrice;
+    const db = Math.abs(b.level - currentPrice) / currentPrice;
+    // Composite: distance penalty + strength bonus
+    const scoreA = da * 100 - a.strength * 0.05;
+    const scoreB = db * 100 - b.strength * 0.05;
+    return scoreA - scoreB;
+  });
   return filtered[0];
+}
+
+// Short-term momentum direction from the last N closes using EMA slope.
+export function shortTermDirection(klines: Kline[], window = 5): "up" | "down" {
+  if (klines.length < window + 1) {
+    const last = klines[klines.length - 1];
+    return last.close >= last.open ? "up" : "down";
+  }
+  const closes = klines.slice(-window - 1).map((k) => k.close);
+  const first = closes[0];
+  const last = closes[closes.length - 1];
+  return last >= first ? "up" : "down";
 }
 
 // Trend detection: combines ADX, EMA slope, BB width, HH/HL structure.
