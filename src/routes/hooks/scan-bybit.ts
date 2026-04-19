@@ -166,11 +166,11 @@ export const Route = createFileRoute("/hooks/scan-bybit")({
     handlers: {
       POST: async () => {
         const runStart = new Date().toISOString();
-        const { data: run } = await supabaseAdmin
+        const { data: run } = (await supabaseAdmin
           .from("scanner_runs" as any)
           .insert({ started_at: runStart, status: "running" })
           .select()
-          .single();
+          .single()) as { data: { id: string } | null };
 
         try {
           const tickers = await getTopSymbols();
