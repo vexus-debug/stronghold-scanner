@@ -134,28 +134,38 @@ export function findSRZones(
     ...lows.map((l) => ({ ...l, kind: "low" as const })),
   ];
 
-  // Cluster
-  const clusters: { prices: number[]; idxs: number[] }[] = [];
+  // Sort pivots by price for stable agglomerative clustering (avoids order bias).
+  all.sort((a, b) => a.price - b.price);
+  const clusters: { prices: number[]; idxs: number[]; mean: number }[] = [];
   for (const p of all) {
     const tol = p.price * tolerancePct;
-    const c = clusters.find(
-      (c) => Math.abs(c.prices.reduce((a, b) => a + b, 0) / c.prices.length - p.price) <= tol
-    );
-    if (c) {
-      c.prices.push(p.price);
-      c.idxs.push(p.idx);
+    // Find best (closest) existing cluster within tolerance, not just the first match.
+    let best: (typeof clusters)[number] | null = null;
+    let bestDist = Infinity;
+    for (const c of clusters) {
+      const d = Math.abs(c.mean - p.price);
+      if (d <= tol && d < bestDist) {
+        best = c;
+        bestDist = d;
+      }
+    }
+    if (best) {
+      best.prices.push(p.price);
+      best.idxs.push(p.idx);
+      best.mean = best.prices.reduce((a, b) => a + b, 0) / best.prices.length;
     } else {
-      clusters.push({ prices: [p.price], idxs: [p.idx] });
+      clusters.push({ prices: [p.price], idxs: [p.idx], mean: p.price });
     }
   }
 
   // Volume profile: total volume in price range
   const totalVolume = klines.reduce((a, k) => a + k.volume, 0) || 1;
+  const lastIdx = klines.length - 1;
 
   const zones: SRZone[] = [];
   for (const c of clusters) {
     if (c.prices.length < minTouches) continue;
-    const level = c.prices.reduce((a, b) => a + b, 0) / c.prices.length;
+    const level = c.mean;
     const tol = level * tolerancePct * 1.5;
     // Volume traded while price was within zone
     let zoneVol = 0;
@@ -164,34 +174,68 @@ export function findSRZones(
     }
     const volumeScore = zoneVol / totalVolume;
     const type = level >= currentPrice ? "resistance" : "support";
-    // strength: touches weight + volume weight
-    const touchScore = Math.min(c.prices.length / 10, 1) * 60;
-    const volScore = Math.min(volumeScore * 5, 1) * 40;
+
+    // Recency: weight zones with recent touches higher (decay over lookback window).
+    const maxIdx = Math.max(...c.idxs);
+    const recency = Math.max(0, 1 - (lastIdx - maxIdx) / klines.length); // 0..1
+
+    // Spread: tight clusters (low std dev relative to level) are more reliable.
+    const mean = level;
+    const variance =
+      c.prices.reduce((a, p) => a + (p - mean) ** 2, 0) / c.prices.length;
+    const spreadPct = Math.sqrt(variance) / mean;
+    const tightness = Math.max(0, 1 - spreadPct / tolerancePct); // 0..1
+
+    // Composite strength
+    const touchScore = Math.min(c.prices.length / 10, 1) * 45;
+    const volScore = Math.min(volumeScore * 5, 1) * 30;
+    const recencyScore = recency * 15;
+    const tightScore = tightness * 10;
+
     zones.push({
       level,
       touches: c.prices.length,
       type,
       volumeScore,
-      strength: touchScore + volScore,
+      strength: touchScore + volScore + recencyScore + tightScore,
     });
   }
   return zones.sort((a, b) => b.strength - a.strength);
 }
 
-// Pick the closest strong S/R the price is heading toward based on last candle direction.
+// Pick the closest strong S/R the price is heading toward based on short-term momentum.
+// Uses the slope of the last N closes (not just one candle's color) for a more robust signal.
 export function nearestHeadingZone(
   zones: SRZone[],
   currentPrice: number,
-  lastCandleDir: "up" | "down"
+  dir: "up" | "down"
 ): SRZone | null {
   const filtered = zones.filter((z) =>
-    lastCandleDir === "up" ? z.level > currentPrice : z.level < currentPrice
+    dir === "up" ? z.level > currentPrice : z.level < currentPrice
   );
   if (filtered.length === 0) return null;
-  filtered.sort(
-    (a, b) => Math.abs(a.level - currentPrice) - Math.abs(b.level - currentPrice)
-  );
+  // Rank by closeness, but prefer stronger zones when distances are similar.
+  filtered.sort((a, b) => {
+    const da = Math.abs(a.level - currentPrice) / currentPrice;
+    const db = Math.abs(b.level - currentPrice) / currentPrice;
+    // Composite: distance penalty + strength bonus
+    const scoreA = da * 100 - a.strength * 0.05;
+    const scoreB = db * 100 - b.strength * 0.05;
+    return scoreA - scoreB;
+  });
   return filtered[0];
+}
+
+// Short-term momentum direction from the last N closes using EMA slope.
+export function shortTermDirection(klines: Kline[], window = 5): "up" | "down" {
+  if (klines.length < window + 1) {
+    const last = klines[klines.length - 1];
+    return last.close >= last.open ? "up" : "down";
+  }
+  const closes = klines.slice(-window - 1).map((k) => k.close);
+  const first = closes[0];
+  const last = closes[closes.length - 1];
+  return last >= first ? "up" : "down";
 }
 
 // Trend detection: combines ADX, EMA slope, BB width, HH/HL structure.
