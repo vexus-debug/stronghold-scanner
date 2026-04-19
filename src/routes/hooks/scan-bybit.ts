@@ -166,7 +166,7 @@ export const Route = createFileRoute("/hooks/scan-bybit")({
     handlers: {
       POST: async () => {
         const runStart = new Date().toISOString();
-        const { data: run } = (await supabaseAdmin
+        const { data: run } = (await supabase
           .from("scanner_runs" as any)
           .insert({ started_at: runStart, status: "running" })
           .select()
@@ -181,14 +181,14 @@ export const Route = createFileRoute("/hooks/scan-bybit")({
             // Upsert in chunks
             for (let i = 0; i < flat.length; i += 200) {
               const chunk = flat.slice(i, i + 200);
-              await supabaseAdmin
+              await supabase
                 .from("scanner_results" as any)
                 .upsert(chunk, { onConflict: "symbol,timeframe" });
             }
           }
 
           if (run) {
-            await supabaseAdmin
+            await supabase
               .from("scanner_runs" as any)
               .update({
                 finished_at: new Date().toISOString(),
@@ -205,7 +205,7 @@ export const Route = createFileRoute("/hooks/scan-bybit")({
           });
         } catch (err: any) {
           if (run) {
-            await supabaseAdmin
+            await supabase
               .from("scanner_runs" as any)
               .update({
                 finished_at: new Date().toISOString(),
