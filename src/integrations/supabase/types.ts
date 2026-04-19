@@ -14,7 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      scanner_results: {
+        Row: {
+          adx: number | null
+          current_price: number
+          heading_toward: boolean | null
+          id: string
+          sr_distance_pct: number | null
+          sr_level: number | null
+          sr_strength: number | null
+          sr_touches: number | null
+          sr_type: string | null
+          symbol: string
+          timeframe: string
+          trend_direction: string | null
+          trend_score: number | null
+          trend_state: string | null
+          updated_at: string
+          volume_24h: number | null
+        }
+        Insert: {
+          adx?: number | null
+          current_price: number
+          heading_toward?: boolean | null
+          id?: string
+          sr_distance_pct?: number | null
+          sr_level?: number | null
+          sr_strength?: number | null
+          sr_touches?: number | null
+          sr_type?: string | null
+          symbol: string
+          timeframe: string
+          trend_direction?: string | null
+          trend_score?: number | null
+          trend_state?: string | null
+          updated_at?: string
+          volume_24h?: number | null
+        }
+        Update: {
+          adx?: number | null
+          current_price?: number
+          heading_toward?: boolean | null
+          id?: string
+          sr_distance_pct?: number | null
+          sr_level?: number | null
+          sr_strength?: number | null
+          sr_touches?: number | null
+          sr_type?: string | null
+          symbol?: string
+          timeframe?: string
+          trend_direction?: string | null
+          trend_score?: number | null
+          trend_state?: string | null
+          updated_at?: string
+          volume_24h?: number | null
+        }
+        Relationships: []
+      }
+      scanner_runs: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: string
+          started_at: string
+          status: string | null
+          symbols_scanned: number | null
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string | null
+          symbols_scanned?: number | null
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          started_at?: string
+          status?: string | null
+          symbols_scanned?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
