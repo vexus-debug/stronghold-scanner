@@ -134,28 +134,38 @@ export function findSRZones(
     ...lows.map((l) => ({ ...l, kind: "low" as const })),
   ];
 
-  // Cluster
-  const clusters: { prices: number[]; idxs: number[] }[] = [];
+  // Sort pivots by price for stable agglomerative clustering (avoids order bias).
+  all.sort((a, b) => a.price - b.price);
+  const clusters: { prices: number[]; idxs: number[]; mean: number }[] = [];
   for (const p of all) {
     const tol = p.price * tolerancePct;
-    const c = clusters.find(
-      (c) => Math.abs(c.prices.reduce((a, b) => a + b, 0) / c.prices.length - p.price) <= tol
-    );
-    if (c) {
-      c.prices.push(p.price);
-      c.idxs.push(p.idx);
+    // Find best (closest) existing cluster within tolerance, not just the first match.
+    let best: (typeof clusters)[number] | null = null;
+    let bestDist = Infinity;
+    for (const c of clusters) {
+      const d = Math.abs(c.mean - p.price);
+      if (d <= tol && d < bestDist) {
+        best = c;
+        bestDist = d;
+      }
+    }
+    if (best) {
+      best.prices.push(p.price);
+      best.idxs.push(p.idx);
+      best.mean = best.prices.reduce((a, b) => a + b, 0) / best.prices.length;
     } else {
-      clusters.push({ prices: [p.price], idxs: [p.idx] });
+      clusters.push({ prices: [p.price], idxs: [p.idx], mean: p.price });
     }
   }
 
   // Volume profile: total volume in price range
   const totalVolume = klines.reduce((a, k) => a + k.volume, 0) || 1;
+  const lastIdx = klines.length - 1;
 
   const zones: SRZone[] = [];
   for (const c of clusters) {
     if (c.prices.length < minTouches) continue;
-    const level = c.prices.reduce((a, b) => a + b, 0) / c.prices.length;
+    const level = c.mean;
     const tol = level * tolerancePct * 1.5;
     // Volume traded while price was within zone
     let zoneVol = 0;
@@ -164,15 +174,30 @@ export function findSRZones(
     }
     const volumeScore = zoneVol / totalVolume;
     const type = level >= currentPrice ? "resistance" : "support";
-    // strength: touches weight + volume weight
-    const touchScore = Math.min(c.prices.length / 10, 1) * 60;
-    const volScore = Math.min(volumeScore * 5, 1) * 40;
+
+    // Recency: weight zones with recent touches higher (decay over lookback window).
+    const maxIdx = Math.max(...c.idxs);
+    const recency = Math.max(0, 1 - (lastIdx - maxIdx) / klines.length); // 0..1
+
+    // Spread: tight clusters (low std dev relative to level) are more reliable.
+    const mean = level;
+    const variance =
+      c.prices.reduce((a, p) => a + (p - mean) ** 2, 0) / c.prices.length;
+    const spreadPct = Math.sqrt(variance) / mean;
+    const tightness = Math.max(0, 1 - spreadPct / tolerancePct); // 0..1
+
+    // Composite strength
+    const touchScore = Math.min(c.prices.length / 10, 1) * 45;
+    const volScore = Math.min(volumeScore * 5, 1) * 30;
+    const recencyScore = recency * 15;
+    const tightScore = tightness * 10;
+
     zones.push({
       level,
       touches: c.prices.length,
       type,
       volumeScore,
-      strength: touchScore + volScore,
+      strength: touchScore + volScore + recencyScore + tightScore,
     });
   }
   return zones.sort((a, b) => b.strength - a.strength);
