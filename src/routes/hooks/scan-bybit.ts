@@ -4,6 +4,7 @@ import {
   detectTrend,
   findSRZones,
   nearestHeadingZone,
+  shortTermDirection,
   type Kline,
 } from "@/lib/ta";
 
@@ -98,22 +99,25 @@ async function scanSymbol(ticker: Ticker) {
     const zones = perTfZones[tfDef.tf];
     if (!k || !zones) continue;
     const last = k[k.length - 1];
-    const lastDir: "up" | "down" = last.close >= last.open ? "up" : "down";
+    // Momentum from last 5 closes — more reliable than a single candle's color.
+    const lastDir = shortTermDirection(k, 5);
     const trend = detectTrend(k);
 
-    // Filter to "very strong": touches >= 5 AND volume node (top 20% volumeScore among zones)
+    // Filter to "very strong": touches >= 5, top-20% volume node, AND strength >= 55.
     if (zones.length === 0) continue;
-    const volThreshold =
-      zones.map((z) => z.volumeScore).sort((a, b) => b - a)[
-        Math.floor(zones.length * 0.2)
-      ] || 0;
+    const sortedVol = zones.map((z) => z.volumeScore).sort((a, b) => b - a);
+    const volThreshold = sortedVol[Math.floor(zones.length * 0.2)] ?? 0;
     const strongZones = zones.filter(
-      (z) => z.touches >= 5 && z.volumeScore >= volThreshold
+      (z) => z.touches >= 5 && z.volumeScore >= volThreshold && z.strength >= 55
     );
     if (strongZones.length === 0) continue;
 
     const heading = nearestHeadingZone(strongZones, last.close, lastDir);
     if (!heading) continue;
+
+    // Sanity: skip if the "heading" zone is implausibly far (>15% away) — likely noise.
+    const distPct = Math.abs(heading.level - last.close) / last.close;
+    if (distPct > 0.15) continue;
 
     const confluence = multiTfConfluence(perTfZones, heading.level);
     // Bonus: confluence across timeframes
