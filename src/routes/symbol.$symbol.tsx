@@ -28,7 +28,7 @@ type ZoneOut = SRZone & { sharpTurnPct: number; distancePct: number };
 type TfAnalysis = {
   tf: string;
   currentPrice: number;
-  direction: "up" | "down";
+  direction: "up" | "down" | "neutral";
   trend: ReturnType<typeof detectTrend>;
   zones: ZoneOut[];
   heading: ZoneOut | null;
@@ -67,7 +67,7 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
         sharpTurnPct: sharpTurnScore(klines, z.level),
         distancePct: ((z.level - last.close) / last.close) * 100,
       }));
-      const heading = nearestHeadingZone(zones, last.close, dir);
+      const heading = nearestHeadingZone(zones, last.close, dir, klines);
       const headingOut = heading
         ? enriched.find((z) => z.level === heading.level) ?? null
         : null;
@@ -195,7 +195,16 @@ function SymbolPage() {
                   <Row label="Direction" value={current.trend.direction} />
                   <Row label="Trend score" value={`${current.trend.score}/3 signals`} />
                   <Row label="ADX" value={current.trend.adxValue.toFixed(1)} />
-                  <Row label="Short-term momentum" value={current.direction === "up" ? "↑ Up" : "↓ Down"} />
+                  <Row
+                    label="Short-term momentum"
+                    value={
+                      current.direction === "up"
+                        ? "↑ Up"
+                        : current.direction === "down"
+                          ? "↓ Down"
+                          : "→ Sideways"
+                    }
+                  />
                 </CardContent>
               </Card>
 
@@ -391,7 +400,10 @@ function TrendIcon({ trend }: { trend: ReturnType<typeof detectTrend> }) {
 
 function Expectation({ a }: { a: TfAnalysis }) {
   if (!a.heading) {
-    return <p>No clear strong level in the current direction. Price may chop sideways until a level forms.</p>;
+    if (a.direction === "neutral") {
+      return <p>Price is moving sideways with no clear direction — not heading toward any level right now.</p>;
+    }
+    return <p>Price is moving {a.direction} but not actively closing in on a strong level. May chop or reverse before reaching one.</p>;
   }
   const dir = a.heading.type === "resistance" ? "up" : "down";
   const sharp = a.heading.sharpTurnPct;
