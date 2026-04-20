@@ -391,7 +391,10 @@ function TrendIcon({ trend }: { trend: ReturnType<typeof detectTrend> }) {
 
 function Expectation({ a }: { a: TfAnalysis }) {
   if (!a.heading) {
-    return <p>No clear strong level in the current direction. Price may chop sideways until a level forms.</p>;
+    if (a.direction === "neutral") {
+      return <p>Price is moving sideways with no clear direction — not heading toward any level right now.</p>;
+    }
+    return <p>Price is moving {a.direction} but not actively closing in on a strong level. May chop or reverse before reaching one.</p>;
   }
   const dir = a.heading.type === "resistance" ? "up" : "down";
   const sharp = a.heading.sharpTurnPct;
