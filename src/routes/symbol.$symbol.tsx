@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SymbolChart } from "@/components/SymbolChart";
 import {
   detectTrend,
   findSRZones,
@@ -32,6 +33,7 @@ type TfAnalysis = {
   trend: ReturnType<typeof detectTrend>;
   zones: ZoneOut[];
   heading: ZoneOut | null;
+  candles: { time: number; open: number; high: number; low: number; close: number }[];
 };
 
 const fetchSymbolAnalysis = createServerFn({ method: "POST" })
@@ -44,8 +46,9 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
       const res = await fetch(url);
       if (!res.ok) continue;
       const json = (await res.json()) as { result: { list: string[][] } };
-      const klines: Kline[] = json.result.list
+      const rows = json.result.list
         .map((r) => ({
+          time: Math.floor(parseInt(r[0], 10) / 1000),
           open: parseFloat(r[1]),
           high: parseFloat(r[2]),
           low: parseFloat(r[3]),
@@ -53,6 +56,13 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
           volume: parseFloat(r[5]),
         }))
         .reverse();
+      const klines: Kline[] = rows.map((r) => ({
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+        volume: r.volume,
+      }));
       if (klines.length < 60) continue;
       const last = klines[klines.length - 1];
       const dir = shortTermDirection(klines, 5);
@@ -71,6 +81,14 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
       const headingOut = heading
         ? enriched.find((z) => z.level === heading.level) ?? null
         : null;
+      // Trim candles for chart payload to last 200 — keeps response small.
+      const candles = rows.slice(-200).map((r) => ({
+        time: r.time,
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+      }));
       out.push({
         tf: tfDef.tf,
         currentPrice: last.close,
@@ -78,6 +96,7 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
         trend,
         zones: enriched,
         heading: headingOut,
+        candles,
       });
     }
     return { symbol, analyses: out };
@@ -182,6 +201,24 @@ function SymbolPage() {
                 ))}
               </TabsList>
             </Tabs>
+
+            <Card>
+              <CardHeader className="pb-3 flex-row items-center justify-between">
+                <CardTitle className="text-sm">Price Chart ({current.tf})</CardTitle>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-primary" /> Heading</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t border-dashed border-bear" /> Resistance</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t border-dashed border-bull" /> Support</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SymbolChart
+                  candles={current.candles}
+                  zones={current.zones}
+                  heading={current.heading}
+                />
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
