@@ -274,15 +274,25 @@ export function sharpTurnScore(
 }
 
 // Short-term momentum direction from the last N closes using EMA slope.
-export function shortTermDirection(klines: Kline[], window = 5): "up" | "down" {
+// Returns "neutral" when the move is too small to be a meaningful direction
+// (avoids labeling sideways chop as heading up/down).
+export function shortTermDirection(
+  klines: Kline[],
+  window = 5,
+  minMovePct = 0.0015
+): "up" | "down" | "neutral" {
   if (klines.length < window + 1) {
     const last = klines[klines.length - 1];
-    return last.close >= last.open ? "up" : "down";
+    const move = (last.close - last.open) / last.open;
+    if (Math.abs(move) < minMovePct) return "neutral";
+    return move > 0 ? "up" : "down";
   }
   const closes = klines.slice(-window - 1).map((k) => k.close);
   const first = closes[0];
   const last = closes[closes.length - 1];
-  return last >= first ? "up" : "down";
+  const movePct = (last - first) / first;
+  if (Math.abs(movePct) < minMovePct) return "neutral";
+  return movePct > 0 ? "up" : "down";
 }
 
 // Trend detection: combines ADX, EMA slope, BB width, HH/HL structure.
