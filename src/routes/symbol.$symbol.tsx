@@ -32,6 +32,7 @@ type TfAnalysis = {
   trend: ReturnType<typeof detectTrend>;
   zones: ZoneOut[];
   heading: ZoneOut | null;
+  candles: { time: number; open: number; high: number; low: number; close: number }[];
 };
 
 const fetchSymbolAnalysis = createServerFn({ method: "POST" })
