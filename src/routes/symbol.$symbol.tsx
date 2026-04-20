@@ -195,7 +195,16 @@ function SymbolPage() {
                   <Row label="Direction" value={current.trend.direction} />
                   <Row label="Trend score" value={`${current.trend.score}/3 signals`} />
                   <Row label="ADX" value={current.trend.adxValue.toFixed(1)} />
-                  <Row label="Short-term momentum" value={current.direction === "up" ? "↑ Up" : "↓ Down"} />
+                  <Row
+                    label="Short-term momentum"
+                    value={
+                      current.direction === "up"
+                        ? "↑ Up"
+                        : current.direction === "down"
+                          ? "↓ Down"
+                          : "→ Sideways"
+                    }
+                  />
                 </CardContent>
               </Card>
 
