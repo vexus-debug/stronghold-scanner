@@ -101,6 +101,8 @@ async function scanSymbol(ticker: Ticker) {
     const last = k[k.length - 1];
     // Momentum from last 5 closes — more reliable than a single candle's color.
     const lastDir = shortTermDirection(k, 5);
+    // Skip when momentum is sideways — nothing is "heading" anywhere.
+    if (lastDir === "neutral") continue;
     const trend = detectTrend(k);
 
     // Filter to "very strong": touches >= 5, top-20% volume node, AND strength >= 55.
@@ -112,7 +114,9 @@ async function scanSymbol(ticker: Ticker) {
     );
     if (strongZones.length === 0) continue;
 
-    const heading = nearestHeadingZone(strongZones, last.close, lastDir);
+    // Pass klines so the helper verifies price is actually closing the distance,
+    // not just sitting near a level after bouncing away from it.
+    const heading = nearestHeadingZone(strongZones, last.close, lastDir, k);
     if (!heading) continue;
 
     // Sanity: skip if the "heading" zone is implausibly far (>15% away) — likely noise.
