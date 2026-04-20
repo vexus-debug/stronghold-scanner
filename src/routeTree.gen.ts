@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SymbolSymbolRouteImport } from './routes/symbol.$symbol'
 import { Route as HooksScanBybitRouteImport } from './routes/hooks/scan-bybit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SymbolSymbolRoute = SymbolSymbolRouteImport.update({
+  id: '/symbol/$symbol',
+  path: '/symbol/$symbol',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HooksScanBybitRoute = HooksScanBybitRouteImport.update({
@@ -26,27 +32,31 @@ const HooksScanBybitRoute = HooksScanBybitRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/hooks/scan-bybit': typeof HooksScanBybitRoute
+  '/symbol/$symbol': typeof SymbolSymbolRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/hooks/scan-bybit': typeof HooksScanBybitRoute
+  '/symbol/$symbol': typeof SymbolSymbolRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/hooks/scan-bybit': typeof HooksScanBybitRoute
+  '/symbol/$symbol': typeof SymbolSymbolRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/hooks/scan-bybit'
+  fullPaths: '/' | '/hooks/scan-bybit' | '/symbol/$symbol'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/hooks/scan-bybit'
-  id: '__root__' | '/' | '/hooks/scan-bybit'
+  to: '/' | '/hooks/scan-bybit' | '/symbol/$symbol'
+  id: '__root__' | '/' | '/hooks/scan-bybit' | '/symbol/$symbol'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HooksScanBybitRoute: typeof HooksScanBybitRoute
+  SymbolSymbolRoute: typeof SymbolSymbolRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/symbol/$symbol': {
+      id: '/symbol/$symbol'
+      path: '/symbol/$symbol'
+      fullPath: '/symbol/$symbol'
+      preLoaderRoute: typeof SymbolSymbolRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hooks/scan-bybit': {
@@ -71,7 +88,17 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HooksScanBybitRoute: HooksScanBybitRoute,
+  SymbolSymbolRoute: SymbolSymbolRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}
