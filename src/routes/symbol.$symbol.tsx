@@ -28,7 +28,7 @@ type ZoneOut = SRZone & { sharpTurnPct: number; distancePct: number };
 type TfAnalysis = {
   tf: string;
   currentPrice: number;
-  direction: "up" | "down";
+  direction: "up" | "down" | "neutral";
   trend: ReturnType<typeof detectTrend>;
   zones: ZoneOut[];
   heading: ZoneOut | null;
@@ -67,7 +67,7 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
         sharpTurnPct: sharpTurnScore(klines, z.level),
         distancePct: ((z.level - last.close) / last.close) * 100,
       }));
-      const heading = nearestHeadingZone(zones, last.close, dir);
+      const heading = nearestHeadingZone(zones, last.close, dir, klines);
       const headingOut = heading
         ? enriched.find((z) => z.level === heading.level) ?? null
         : null;
