@@ -208,14 +208,31 @@ export function findSRZones(
 export function nearestHeadingZone(
   zones: SRZone[],
   currentPrice: number,
-  dir: "up" | "down"
+  dir: "up" | "down" | "neutral",
+  klines?: Kline[]
 ): SRZone | null {
+  if (dir === "neutral") return null;
   const filtered = zones.filter((z) =>
     dir === "up" ? z.level > currentPrice : z.level < currentPrice
   );
   if (filtered.length === 0) return null;
+  // Verify price is actually CLOSING the distance to the zone (not just near it).
+  // If klines provided, require recent price action to have moved toward the level.
+  let candidates = filtered;
+  if (klines && klines.length >= 6) {
+    const window = Math.min(5, klines.length - 1);
+    const pastPrice = klines[klines.length - 1 - window].close;
+    candidates = filtered.filter((z) => {
+      const distNow = Math.abs(z.level - currentPrice);
+      const distPast = Math.abs(z.level - pastPrice);
+      // Require the gap to have shrunk by at least 5% of the past distance —
+      // filters out cases where price merely sits near a level without approaching it.
+      return distNow < distPast * 0.95;
+    });
+    if (candidates.length === 0) return null;
+  }
   // Rank by closeness, but prefer stronger zones when distances are similar.
-  filtered.sort((a, b) => {
+  candidates.sort((a, b) => {
     const da = Math.abs(a.level - currentPrice) / currentPrice;
     const db = Math.abs(b.level - currentPrice) / currentPrice;
     // Composite: distance penalty + strength bonus
@@ -223,7 +240,7 @@ export function nearestHeadingZone(
     const scoreB = db * 100 - b.strength * 0.05;
     return scoreA - scoreB;
   });
-  return filtered[0];
+  return candidates[0];
 }
 
 // Average % reversal away from a level after price touched it.
