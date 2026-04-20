@@ -202,6 +202,24 @@ function SymbolPage() {
               </TabsList>
             </Tabs>
 
+            <Card>
+              <CardHeader className="pb-3 flex-row items-center justify-between">
+                <CardTitle className="text-sm">Price Chart ({current.tf})</CardTitle>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 bg-primary" /> Heading</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t border-dashed border-bear" /> Resistance</span>
+                  <span className="flex items-center gap-1"><span className="inline-block h-0.5 w-3 border-t border-dashed border-bull" /> Support</span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SymbolChart
+                  candles={current.candles}
+                  zones={current.zones}
+                  heading={current.heading}
+                />
+              </CardContent>
+            </Card>
+
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
                 <CardHeader className="pb-3">
