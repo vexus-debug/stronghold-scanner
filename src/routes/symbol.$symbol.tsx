@@ -45,8 +45,9 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
       const res = await fetch(url);
       if (!res.ok) continue;
       const json = (await res.json()) as { result: { list: string[][] } };
-      const klines: Kline[] = json.result.list
+      const rows = json.result.list
         .map((r) => ({
+          time: Math.floor(parseInt(r[0], 10) / 1000),
           open: parseFloat(r[1]),
           high: parseFloat(r[2]),
           low: parseFloat(r[3]),
@@ -54,6 +55,13 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
           volume: parseFloat(r[5]),
         }))
         .reverse();
+      const klines: Kline[] = rows.map((r) => ({
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+        volume: r.volume,
+      }));
       if (klines.length < 60) continue;
       const last = klines[klines.length - 1];
       const dir = shortTermDirection(klines, 5);
@@ -72,6 +80,14 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
       const headingOut = heading
         ? enriched.find((z) => z.level === heading.level) ?? null
         : null;
+      // Trim candles for chart payload to last 200 — keeps response small.
+      const candles = rows.slice(-200).map((r) => ({
+        time: r.time,
+        open: r.open,
+        high: r.high,
+        low: r.low,
+        close: r.close,
+      }));
       out.push({
         tf: tfDef.tf,
         currentPrice: last.close,
@@ -79,6 +95,7 @@ const fetchSymbolAnalysis = createServerFn({ method: "POST" })
         trend,
         zones: enriched,
         heading: headingOut,
+        candles,
       });
     }
     return { symbol, analyses: out };
