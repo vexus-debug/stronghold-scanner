@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,7 @@ function Index() {
   const [search, setSearch] = useState("");
   const [scanning, setScanning] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const fetchData = async () => {
     const { data } = await supabase
@@ -166,7 +167,11 @@ function Index() {
                   {filtered.map((r) => {
                     const isRes = r.sr_type === "resistance";
                     return (
-                      <tr key={r.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <tr
+                        key={r.id}
+                        onClick={() => navigate({ to: "/symbol/$symbol", params: { symbol: r.symbol } })}
+                        className="border-t border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                      >
                         <td className="px-3 py-2.5 font-mono font-medium">{r.symbol.replace("USDT", "")}<span className="text-muted-foreground text-xs">/USDT</span></td>
                         <td className="px-3 py-2.5 text-right font-mono">{fmtPrice(Number(r.current_price))}</td>
                         <td className="px-3 py-2.5">

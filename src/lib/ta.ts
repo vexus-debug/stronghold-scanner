@@ -226,6 +226,36 @@ export function nearestHeadingZone(
   return filtered[0];
 }
 
+// Average % reversal away from a level after price touched it.
+// High value => the level historically caused sharp turns.
+export function sharpTurnScore(
+  klines: Kline[],
+  level: number,
+  tolerancePct = 0.004,
+  lookahead = 8
+): number {
+  const tol = level * tolerancePct * 1.5;
+  const reversals: number[] = [];
+  for (let i = 0; i < klines.length - lookahead; i++) {
+    const k = klines[i];
+    if (k.low <= level + tol && k.high >= level - tol) {
+      // Approached from below (resistance) → measure drop after
+      // Approached from above (support) → measure bounce after
+      const window = klines.slice(i + 1, i + 1 + lookahead);
+      const minLow = Math.min(...window.map((w) => w.low));
+      const maxHigh = Math.max(...window.map((w) => w.high));
+      const dropPct = ((level - minLow) / level) * 100;
+      const bouncePct = ((maxHigh - level) / level) * 100;
+      reversals.push(Math.max(dropPct, bouncePct));
+    }
+  }
+  if (reversals.length === 0) return 0;
+  // Average of top half of reversals — emphasize the sharp ones.
+  reversals.sort((a, b) => b - a);
+  const top = reversals.slice(0, Math.max(1, Math.floor(reversals.length / 2)));
+  return top.reduce((a, b) => a + b, 0) / top.length;
+}
+
 // Short-term momentum direction from the last N closes using EMA slope.
 export function shortTermDirection(klines: Kline[], window = 5): "up" | "down" {
   if (klines.length < window + 1) {
